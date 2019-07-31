@@ -26,7 +26,7 @@ contract Auctionable is Pausable {
     }
 
     mapping(bytes32 => AuctionProduct) public auctionProduct;
-    mapping(address => mapping(bytes32 => uint)) userAuctionBid;
+    mapping(address => mapping(bytes32 => uint)) public userAuctionBid;
     mapping(bytes32 => bytes32[]) public auctionProductsOfStore;
     mapping(address => bool) public storeOwner;
     mapping(bytes32 => Store) public store;

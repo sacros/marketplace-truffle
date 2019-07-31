@@ -10,7 +10,7 @@ import "./lib/Ownable.sol";
   */
 contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
 
-    enum UserType  {ADMIN, SHOP_OWNER, CUSTOMER}
+    enum UserType  {OWNER, ADMIN, SHOP_OWNER, CUSTOMER}
 
     struct Product {
         string name;
@@ -145,18 +145,18 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         newAdmin(_admin)
         whenNotPaused
     {
-            admin[_admin] = true;
-            admins.push(_admin);
-            emit LogNewAdminAdded(_admin);
+        admin[_admin] = true;
+        admins.push(_admin);
+        emit LogNewAdminAdded(_admin);
     }
 
     /** @dev Removes a present admin from the system.
       * @param _admin Address of new admin.
       */
     function removeAdmin(address _admin) public onlyOwner whenNotPaused {
-            admin[_admin] = false;
-            removeAdminFromAdminList(_admin);
-            emit LogAdminRemoved(_admin);
+        admin[_admin] = false;
+        removeAdminFromAdminList(_admin);
+        emit LogAdminRemoved(_admin);
     }
 
     /** @dev Adds a new store owner to the system.
@@ -168,9 +168,9 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         newStoreOwner(_newStoreOwner)
         whenNotPaused
     {
-            storeOwner[_newStoreOwner] = true;
-            storeOwners.push(_newStoreOwner);
-            emit LogNewStoreOwnerAdded(_newStoreOwner, msg.sender);
+        storeOwner[_newStoreOwner] = true;
+        storeOwners.push(_newStoreOwner);
+        emit LogNewStoreOwnerAdded(_newStoreOwner, msg.sender);
     }
 
     /** @dev Removes store owner from the system.
@@ -181,9 +181,9 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         onlyAdmin
         whenNotPaused
     {
-            storeOwner[_storeOwner] = false;
-            removeStoreOwnerFromStoreOwnerList(_storeOwner);
-            emit LogStoreOwnerRemoved(_storeOwner);
+        storeOwner[_storeOwner] = false;
+        removeStoreOwnerFromStoreOwnerList(_storeOwner);
+        emit LogStoreOwnerRemoved(_storeOwner);
     }
 
     /** @dev Adds new store to the marketplace.
@@ -196,13 +196,13 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         newStore(_storeId)
         whenNotPaused
     {
-            Store memory thisStore;
-            thisStore.name = _name;
-            thisStore.owner = msg.sender;
-            store[_storeId] = thisStore;
-            stores.push(_storeId);
-            storesOfOwners[msg.sender].push(_storeId);
-            emit LogNewStoreAdded(_storeId, msg.sender);
+        Store memory thisStore;
+        thisStore.name = _name;
+        thisStore.owner = msg.sender;
+        store[_storeId] = thisStore;
+        stores.push(_storeId);
+        storesOfOwners[msg.sender].push(_storeId);
+        emit LogNewStoreAdded(_storeId, msg.sender);
     }
 
     /** @dev Removes a store from the marketplace.
@@ -214,9 +214,10 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         ownerOfStore(_storeId)
         whenNotPaused
     {
-            delete store[_storeId];
-            removeStoreFromStoreList(_storeId);
-            emit LogStoreRemoved(_storeId, msg.sender);
+        delete store[_storeId];
+        removeStoreFromStoreList(_storeId);
+        removeStoreFromStoresOfOwnersList(_storeId, msg.sender);
+        emit LogStoreRemoved(_storeId, msg.sender);
     }
 
     /** @dev Adds new product to the store.
@@ -239,14 +240,14 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         newProduct(_productId)
         whenNotPaused
     {
-            Product memory thisProduct;
-            thisProduct.name = _name;
-            thisProduct.quantity = _quantity;
-            thisProduct.value = _value;
-            thisProduct.storeId = _storeId;
-            product[_productId] = thisProduct;
-            productsOfStore[_storeId].push(_productId);
-            emit LogNewProductAdded(_storeId, _productId, msg.sender);
+        Product memory thisProduct;
+        thisProduct.name = _name;
+        thisProduct.quantity = _quantity;
+        thisProduct.value = _value;
+        thisProduct.storeId = _storeId;
+        product[_productId] = thisProduct;
+        productsOfStore[_storeId].push(_productId);
+        emit LogNewProductAdded(_storeId, _productId, msg.sender);
     }
 
     /** @dev Edits product details.
@@ -270,16 +271,16 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         alreadyPresentProduct(_productId)
         whenNotPaused
     {
-            product[_productId].name = _name;
-            product[_productId].value = _value;
-            product[_productId].quantity = _quantity;
-            emit LogProductDetailsChanged(
-                _storeId,
-                _productId,
-                _name,
-                _quantity,
-                _value
-            );
+        product[_productId].name = _name;
+        product[_productId].value = _value;
+        product[_productId].quantity = _quantity;
+        emit LogProductDetailsChanged(
+            _storeId,
+            _productId,
+            _name,
+            _quantity,
+            _value
+        );
     }
 
     /** @dev Removes product from the marketplace.
@@ -291,9 +292,9 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         ownerOfStore(product[_productId].storeId)
         whenNotPaused
     {
-            removeProductFromStore(product[_productId].storeId, _productId);
-            delete product[_productId];
-            emit LogProductRemoved(_productId, product[_productId].storeId);
+        removeProductFromStore(product[_productId].storeId, _productId);
+        delete product[_productId];
+        emit LogProductRemoved(_productId, product[_productId].storeId);
     }
 
     /** @dev Withdraws funds of store owner.
@@ -305,9 +306,9 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         validWithdrawValue(amount)
         sufficientBalance(amount)
     {
-            balances[msg.sender] -= amount;
-            msg.sender.transfer(amount);
-            emit LogFundsWithdrawn(msg.sender, amount);
+        balances[msg.sender] -= amount;
+        msg.sender.transfer(amount);
+        emit LogFundsWithdrawn(msg.sender, amount);
     }
 
     /** @dev Buys a product from the marketplace.
@@ -322,10 +323,10 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         sufficientFundsAndStocks(_productId, _quantity)
         whenNotPaused
     {
-            address _storeOwner = store[product[_productId].storeId].owner;
-            balances[_storeOwner] += product[_productId].value * _quantity;
-            product[_productId].quantity -= _quantity;
-            emit LogProductBought(msg.sender, _productId);
+        address _storeOwner = store[product[_productId].storeId].owner;
+        balances[_storeOwner] += product[_productId].value * _quantity;
+        product[_productId].quantity -= _quantity;
+        emit LogProductBought(msg.sender, _productId);
     }
 
     /** @dev Gets the type of user calling this function.
@@ -351,35 +352,35 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         bytes32
     )
     {
-            Product memory _product = product[_productId];
-            return (_product.name, _product.quantity,
-                _product.value, _product.storeId);
+        Product memory _product = product[_productId];
+        return (_product.name, _product.quantity,
+            _product.value, _product.storeId);
     }
 
     /** @dev Removes a particular product from the list of a store's products.
-      * @param storeId Id of the store.
-      * @param productId Id of the product.
+      * @param _storeId Id of the store.
+      * @param _productId Id of the product.
       */
     function removeProductFromStore(
-        bytes32 storeId,
-        bytes32 productId
+        bytes32 _storeId,
+        bytes32 _productId
     )
         internal
     {
-            bytes32[] memory products = productsOfStore[storeId];
-            if (products[products.length - 1] == productId) {
-                productsOfStore[storeId].length--;
+        bytes32[] memory products = productsOfStore[_storeId];
+        if (products[products.length - 1] == _productId) {
+            productsOfStore[_storeId].length--;
+            return;
+        }
+        for(uint i = 0; i < products.length - 1; i++) {
+            if (products[i] == _productId) {
+                productsOfStore[_storeId][i] = products
+                    [products.length - 1];
+                productsOfStore[_storeId].length--;
                 return;
             }
-            for(uint i = 0; i < products.length - 1; i++) {
-                if (products[i] == productId) {
-                    productsOfStore[storeId][i] = products
-                        [products.length - 1];
-                    productsOfStore[storeId].length--;
-                    return;
-                }
-            }
-            revert("product not found.");
+        }
+        revert("product not found.");
     }
 
     /** @dev Removes a particular admin from the list of admins.
@@ -390,18 +391,18 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
     )
         internal
     {
-            if (admins[admins.length - 1] == _admin) {
+        if (admins[admins.length - 1] == _admin) {
+            admins.length--;
+            return;
+        }
+        for(uint i = 0; i < admins.length - 1; i++) {
+            if (admins[i] == _admin) {
+                admins[i] = admins[admins.length - 1];
                 admins.length--;
                 return;
             }
-            for(uint i = 0; i < admins.length - 1; i++) {
-                if (admins[i] == _admin) {
-                    admins[i] = admins[admins.length - 1];
-                    admins.length--;
-                    return;
-                }
-            }
-            revert("admin not found");
+        }
+        revert("admin not found");
     }
 
     /** @dev Removes a particular store owner from the list of store owners.
@@ -412,18 +413,18 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
     )
         internal
     {
-            if (storeOwners[storeOwners.length - 1] == _storeOwner) {
+        if (storeOwners[storeOwners.length - 1] == _storeOwner) {
+            storeOwners.length--;
+            return;
+        }
+        for(uint i = 0; i < storeOwners.length - 1; i++) {
+            if (storeOwners[i] == _storeOwner) {
+                storeOwners[i] = storeOwners[storeOwners.length - 1];
                 storeOwners.length--;
                 return;
             }
-            for(uint i = 0; i < storeOwners.length - 1; i++) {
-                if (storeOwners[i] == _storeOwner) {
-                    storeOwners[i] = storeOwners[storeOwners.length - 1];
-                    storeOwners.length--;
-                    return;
-                }
-            }
-            revert("store owner not found");
+        }
+        revert("store owner not found");
     }
 
     /** @dev Removes a particular store from the list of stores.
@@ -434,18 +435,44 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
     )
         internal
     {
-            if (stores[stores.length - 1] == _storeId) {
+        if (stores[stores.length - 1] == _storeId) {
+            stores.length--;
+            return;
+        }
+        for(uint i = 0; i < stores.length - 1; i++) {
+            if (stores[i] == _storeId) {
+                stores[i] = stores[stores.length - 1];
                 stores.length--;
                 return;
             }
-            for(uint i = 0; i < stores.length - 1; i++) {
-                if (stores[i] == _storeId) {
-                    stores[i] = stores[stores.length - 1];
-                    stores.length--;
-                    return;
-                }
+        }
+        revert("store not found");
+    }
+
+    /** @dev Removes a particular store from the list of stores.
+      * @param _storeId Id of the store.
+      * @param _storeOwner Id of the store.
+      */
+    function removeStoreFromStoresOfOwnersList(
+        bytes32 _storeId,
+        address _storeOwner
+    )
+        internal
+    {
+        bytes32[] memory stores_ = storesOfOwners[_storeOwner];
+        if (stores_[stores_.length - 1] == _storeId) {
+                storesOfOwners[_storeOwner].length--;
+                return;
+        }
+        for(uint i = 0; i < stores_.length - 1; i++) {
+            if (stores_[i] == _storeId) {
+                stores_[i]
+                    = stores_[stores_.length - 1];
+                storesOfOwners[_storeOwner].length--;
+                return;
             }
-            revert("store not found");
+        }
+        revert("store not found");
     }
 
 }
