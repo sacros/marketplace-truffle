@@ -44,8 +44,8 @@ module.exports = {
     //
     development: {
      host: "127.0.0.1",     // Localhost (default: none)
-     port: 7545,            // Standard Ethereum port (default: none)
-    //  gas: 8000000,           // Gas sent with each transaction (default: ~6700000)
+     port: 9545,            // Standard Ethereum port (default: none)
+    //  gas: 6700000,           // Gas sent with each transaction (default: ~6700000)
      network_id: "*",       // Any network (default: none)
     },
 
@@ -90,10 +90,10 @@ module.exports = {
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
       settings: {          // See the solidity docs for advice about optimization and evmVersion
        optimizer: {
-         enabled: false,
+         enabled: true,
          runs: 200
        }
-      //  evmVersion: "byzantium"
+      //  evmVersion: "homestead"
       }
     }
   }

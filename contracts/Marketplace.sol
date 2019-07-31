@@ -1,5 +1,6 @@
 pragma solidity ^0.5.0;
 
+import "./Auctionable.sol";
 import "./lib/Destructible.sol";
 import "./lib/Pausable.sol";
 import "./lib/Ownable.sol";
@@ -7,10 +8,9 @@ import "./lib/Ownable.sol";
 /** @author Shubham Suyal
   * @title Online Marketplace
   */
-contract Marketplace is Ownable, Destructible, Pausable {
+contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
 
     enum UserType  {ADMIN, SHOP_OWNER, CUSTOMER}
-    enum AuctionProductSatus {ONGOING, ENDED, CANCELED}
 
     struct Product {
         string name;
@@ -19,45 +19,17 @@ contract Marketplace is Ownable, Destructible, Pausable {
         bytes32 storeId;
     }
 
-    struct AuctionProduct {
-        string name;
-        bytes32 storeId;
-        uint endBlock;
-        address buyer;
-        uint startBid;
-        uint highestBid;
-        address highestBidder;
-        AuctionProductSatus status;
-    }
-
-    struct Store {
-        string name;
-        address owner;
-    }
-
-    mapping(address => uint) public balances;
     mapping(address => bool) public admin;
-    mapping(address => bool) public storeOwner;
     mapping(address => bytes32[]) public storesOfOwners;
     mapping(bytes32 => Product) public product;
-    mapping(bytes32 => AuctionProduct) public auctionProduct;
-    mapping(bytes32 => Store) public store;
-    mapping(address => mapping(bytes32 => uint)) userAuctionBid;
     mapping(bytes32 => bytes32[]) public productsOfStore;
-    mapping(bytes32 => bytes32[]) public auctionProductsOfStore;
 
-    bool public stopped;
     address[] public admins;
     address[] public storeOwners;
     bytes32[] public stores;
 
     modifier onlyAdmin {
         require(admin[msg.sender] == true, "user not an admin.");
-        _;
-    }
-
-    modifier onlyStoreOwner {
-        require(storeOwner[msg.sender] == true, "user not a store owner.");
         _;
     }
 
@@ -72,12 +44,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
         _;
     }
 
-    modifier ownerOfStore(bytes32 storeId) {
-        require(store[storeId].owner == msg.sender,
-            "user not the owner of this store.");
-        _;
-    }
-
     modifier newStore(bytes32 storeId) {
         require(bytes(store[storeId].name).length == 0,
             "store with this storeId already exists.");
@@ -87,18 +53,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
     modifier newProduct(bytes32 productId) {
         require(bytes(product[productId].name).length == 0,
             "product with this productId already exists.");
-        _;
-    }
-
-    modifier newAuctionProduct(bytes32 productId) {
-        require(bytes(auctionProduct[productId].name).length == 0,
-            "auction product with this productId already exists.");
-        _;
-    }
-
-    modifier checkEndBlock(uint _endBlock) {
-        require(_endBlock > block.number,
-            "end block should be greater than current block.");
         _;
     }
 
@@ -125,38 +79,8 @@ contract Marketplace is Ownable, Destructible, Pausable {
         msg.sender.transfer(refundAmount);
     }
 
-    modifier auctionAlive(bytes32 _productId) {
-        require(auctionProduct[_productId].status ==
-            AuctionProductSatus.ONGOING, "auction ended/canceled.");
-        require(block.number < auctionProduct[_productId].endBlock,
-            "auction not alive.");
-        _;
-    }
-
-    modifier auctionOngoing(bytes32 _productId) {
-        require(auctionProduct[_productId].status ==
-            AuctionProductSatus.ONGOING, "auction not ongoing.");
-        _;
-    }
-
-    modifier auctionNotAlive(bytes32 _productId) {
-        require(auctionProduct[_productId].status !=
-            AuctionProductSatus.ONGOING, "auction is still alive.");
-        _;
-    }
-
     modifier sufficientBalance(uint _amount) {
         require(balances[msg.sender] >= _amount, "insufficient balance.");
-        _;
-    }
-
-    modifier validBid() {
-        require(msg.value > 0, "zero value bid.");
-        _;
-    }
-
-    modifier validWithdrawValue(uint value) {
-        require(value > 0, "zero value withdraw.");
         _;
     }
 
@@ -192,20 +116,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
         bytes32 indexed productId,
         address indexed storeOwner
     );
-    event LogNewAuctionProductAdded(
-        bytes32 indexed storeId,
-        bytes32 indexed productId,
-        address indexed storeOwner
-    );
-    event LogAuctionCanceled(
-        bytes32 indexed productId,
-        bytes32 indexed storeId
-    );
-    event LogAuctionEnded(
-        bytes32 indexed productId,
-        bytes32 indexed storeId,
-        address indexed highestBidder
-    );
     event LogProductDetailsChanged(
         bytes32 indexed storeId,
         bytes32 indexed productId,
@@ -219,12 +129,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
     );
     event LogFundsWithdrawn(address indexed storeOwner, uint amount);
     event LogProductBought(address indexed buyer, bytes32 indexed productId);
-    event LogBidPlaced(address indexed bidder, uint amount);
-    event LogAuctionBidWithdrawn(address indexed bidder, uint amount);
-
-    constructor() public {
-        owner = msg.sender;
-    }
 
     /** @dev Fallback function to save ethers sent by mistake to the contract.
       */
@@ -345,76 +249,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
             emit LogNewProductAdded(_storeId, _productId, msg.sender);
     }
 
-    /** @dev Adds new product to the auction.
-      * @param _storeId Id of the store.
-      * @param _productId Id of the auction product.
-      * @param _name Name of the product.
-      * @param _endBlock Last block till auction validity.
-      * @param _startBid Start Bid amount of auction.
-      */
-    function addAuctionProduct(
-        bytes32 _storeId,
-        bytes32 _productId,
-        string memory _name,
-        uint _endBlock,
-        uint _startBid
-    )
-        public
-        onlyStoreOwner
-        ownerOfStore(_storeId)
-        checkEndBlock(_endBlock)
-        newAuctionProduct(_productId)
-        whenNotPaused
-    {
-            AuctionProduct memory thisProduct;
-            thisProduct.name = _name;
-            thisProduct.endBlock = _endBlock;
-            thisProduct.startBid = _startBid;
-            thisProduct.storeId = _storeId;
-            thisProduct.status = AuctionProductSatus.ONGOING;
-            auctionProduct[_productId] = thisProduct;
-            auctionProductsOfStore[_storeId].push(_productId);
-            emit LogNewAuctionProductAdded(_storeId, _productId, msg.sender);
-    }
-
-    /** @dev Cancels an auction.
-      * @param _productId ProductId of auction product.
-      */
-    function cancelAuction(bytes32 _productId)
-        public
-        onlyStoreOwner
-        ownerOfStore(auctionProduct[_productId].storeId)
-        auctionOngoing(_productId)
-        whenNotPaused
-    {
-            auctionProduct[_productId].status = AuctionProductSatus.CANCELED;
-            emit LogAuctionCanceled(
-                _productId,
-                auctionProduct[_productId].storeId
-            );
-    }
-
-    /** @dev Ends an ongoing auction.
-      * @param _productId Id of the auction product.
-      */
-    function endAuction(bytes32 _productId)
-        public
-        onlyStoreOwner
-        ownerOfStore(auctionProduct[_productId].storeId)
-        auctionAlive(_productId)
-        whenNotPaused
-    {
-            auctionProduct[_productId].status = AuctionProductSatus.ENDED;
-            balances[msg.sender] += auctionProduct[_productId].highestBid;
-            userAuctionBid[auctionProduct[_productId].highestBidder]
-                [_productId] = 0;
-            emit LogAuctionEnded(
-                _productId,
-                auctionProduct[_productId].storeId,
-                auctionProduct[_productId].highestBidder
-            );
-    }
-
     /** @dev Edits product details.
       * @param _storeId Id of the store.
       * @param _productId Id of the product.
@@ -494,88 +328,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
             emit LogProductBought(msg.sender, _productId);
     }
 
-    /** @dev Places a bid for an auction.
-      * @param _productId Id of the auction product.
-      */
-    function placeBid(bytes32 _productId)
-        public
-        payable
-        auctionAlive(_productId)
-        validBid
-        whenNotPaused
-    {
-            userAuctionBid[msg.sender][_productId] += msg.value;
-            if (auctionProduct[_productId].highestBid <
-                userAuctionBid[msg.sender][_productId] &&
-                userAuctionBid[msg.sender][_productId] >=
-                auctionProduct[_productId].startBid) {
-                    auctionProduct[_productId].highestBid =
-                        userAuctionBid[msg.sender][_productId];
-                    auctionProduct[_productId].highestBidder = msg.sender;
-            }
-            emit LogBidPlaced(
-                msg.sender,
-                userAuctionBid[msg.sender][_productId]
-            );
-    }
-
-    /** @dev Withdraws auction fund of customer.
-      * @param _productId Id of the product.
-      */
-    function withdrawAuctionBid(bytes32 _productId)
-        public
-        auctionNotAlive(_productId)
-        validWithdrawValue(userAuctionBid[msg.sender][_productId])
-    {
-            uint amountToTransfer = userAuctionBid[msg.sender][_productId];
-            userAuctionBid[msg.sender][_productId] = 0;
-            msg.sender.transfer(amountToTransfer);
-            emit LogAuctionBidWithdrawn(msg.sender, amountToTransfer);
-    }
-
-    /** @dev Gets all admins in the system.
-      * @return admins List of admins in the system.
-      */
-    function getAllAdmins() public view returns (address[] memory) {
-        return admins;
-    }
-
-    /** @dev Gets all store owners in the system.
-      * @return storeOwner List of store owners in the system.
-      */
-    function getAllStoreOwner() public view returns (address[] memory) {
-        return storeOwners;
-    }
-
-    /** @dev Gets all stores in the marketplace.
-      * @return stores List of stores in the marketplace.
-      */
-    function getAllStores() public view returns (bytes32[] memory) {
-        return stores;
-    }
-
-    /** @dev Gets list of stores of a particular store owner.
-      * @param _shopOwner Address of the store owner.
-      * @return storesOfOwners List of stores of that store owner.
-      */
-    function getStoresOfOwners(address _shopOwner)
-        public view returns (bytes32[] memory)
-    {
-            return storesOfOwners[_shopOwner];
-    }
-
-    /** @dev Gets details of a particular store in the marketplace.
-      * @param storeId Id of the store.
-      * @return store.name Name of the store.
-      * @return store.owner Address of the store owner.
-      */
-    function getStoreDetails(bytes32 storeId)
-        public view returns (string memory, address)
-    {
-            Store memory this_store = store[storeId];
-            return (this_store.name, this_store.owner);
-    }
-
     /** @dev Gets the type of user calling this function.
       * @return UserType Type of user.
       */
@@ -583,37 +335,6 @@ contract Marketplace is Ownable, Destructible, Pausable {
         if (admin[msg.sender] == true) return UserType .ADMIN;
         else if (storeOwner[msg.sender] == true) return UserType .SHOP_OWNER;
         else return UserType .CUSTOMER;
-    }
-
-    /** @dev Gets remaining funds a store owner has in the system.
-      * @return balance Balance of the store owner.
-      */
-    function getRemainingBalance() public onlyStoreOwner view returns (uint) {
-        return balances[msg.sender];
-    }
-
-    /** @dev Gets all the products of a particular store.
-      * @param _storeId Id of the store.
-      * @return productsOfStore List of productIds of a store.
-      */
-    function getAllProductsOfStore(
-        bytes32 _storeId
-    )
-    public view returns (bytes32[] memory)
-    {
-        return productsOfStore[_storeId];
-    }
-
-    /** @dev Gets all products in auction of a particular store.
-      * @param _storeId Id of the store.
-      * @return auctionProductsOfStore List of auction products of a store.
-      */
-    function getAllAuctionProductsOfStore(
-        bytes32 _storeId
-    )
-    public view returns (bytes32[] memory)
-    {
-        return auctionProductsOfStore[_storeId];
     }
 
     /** @dev Gets details of a particular product.
@@ -652,8 +373,8 @@ contract Marketplace is Ownable, Destructible, Pausable {
             }
             for(uint i = 0; i < products.length - 1; i++) {
                 if (products[i] == productId) {
-                    productsOfStore[storeId][i] =
-                        products[products.length - 1];
+                    productsOfStore[storeId][i] = products
+                        [products.length - 1];
                     productsOfStore[storeId].length--;
                     return;
                 }
