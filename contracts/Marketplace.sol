@@ -466,8 +466,7 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
         }
         for(uint i = 0; i < stores_.length - 1; i++) {
             if (stores_[i] == _storeId) {
-                stores_[i]
-                    = stores_[stores_.length - 1];
+                stores_[i] = stores_[stores_.length - 1];
                 storesOfOwners[_storeOwner].length--;
                 return;
             }
