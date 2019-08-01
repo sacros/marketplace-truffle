@@ -333,9 +333,31 @@ contract Marketplace is Ownable, Destructible, Pausable, Auctionable {
       * @return UserType Type of user.
       */
     function getUserType () public view returns (UserType) {
-        if (admin[msg.sender] == true) return UserType .ADMIN;
+        if(msg.sender == owner) return UserType.OWNER;
+        else if (admin[msg.sender] == true) return UserType .ADMIN;
         else if (storeOwner[msg.sender] == true) return UserType .SHOP_OWNER;
         else return UserType .CUSTOMER;
+    }
+
+    /** @dev Gets the list of admins.
+      * @return admins List of admins.
+      */
+    function getAdmins() public view returns (address[] memory) {
+        return admins;
+    }
+
+    /** @dev Gets the list of admins.
+      * @return admins List of admins.
+      */
+    function getStoreOwners() public view returns (address[] memory) {
+        return storeOwners;
+    }
+    
+    /** @dev Gets the list of admins.
+      * @return admins List of admins.
+      */
+    function getStores() public view returns (bytes32[] memory) {
+        return stores;
     }
 
     /** @dev Gets details of a particular product.
