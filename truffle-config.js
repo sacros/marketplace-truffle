@@ -16,7 +16,7 @@ module.exports = {
       host: "localhost",
       port: 8545,
       network_id: 4,
-      confirmations: 6,
+      confirmations: 3,
       timeoutBlocks: 200
     }
   },
