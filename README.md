@@ -9,9 +9,14 @@ git clone https://github.com/sacros/marketplace-truffle
 
 #### The smart contract can be build/tested/deployed with:
 ```sh
-truffle test
 truffle compile
 truffle migrate
+```
+
+#### For testing the smart contract:
+```sh
+truffle develop
+truffle test
 ```
 
 #### For the UI,
